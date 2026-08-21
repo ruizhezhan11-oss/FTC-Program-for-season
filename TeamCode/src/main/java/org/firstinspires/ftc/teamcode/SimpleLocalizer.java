@@ -1,55 +1,47 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 public class SimpleLocalizer {
-    private DcMotorEx podForward, podStrafe;
-    private IMU imu;
-
-    private final double INCHES_PER_TICK = (1.88976 * Math.PI) / 2000.0;
+    public GoBildaPinpointDriver odo;
 
     public double x = 0, y = 0, heading = 0;
-    private double lastForward = 0, lastStrafe = 0;
 
-    public SimpleLocalizer(HardwareMap hardwareMap) {
-        podForward = hardwareMap.get(DcMotorEx.class, "par0");
-        podStrafe = hardwareMap.get(DcMotorEx.class, "par1");
-        imu = hardwareMap.get(IMU.class, "imu");
-        RevHubOrientationOnRobot.LogoFacingDirection logoDirection = RevHubOrientationOnRobot.LogoFacingDirection.UP;
-        RevHubOrientationOnRobot.UsbFacingDirection usbDirection = RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
-        imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(logoDirection, usbDirection)));
+    public SimpleLocalizer (HardwareMap hardwareMap) {
+        // 讀取在 Robot Configuration 裡設定名稱為 "pinpoint" 的裝置
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+
+        // 1. 設定定位輪類型 (請依實際購買的 Pod 型號選擇，例如 4-Bar 或 Swingarm)
+        odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+
+        // 2. 設定 Pod 距離機器人旋轉中心的物理距離 (單位：公釐 mm)
+        odo.setOffsets(-84.0, -168.0, DistanceUnit.MM);
+        // 3. 設定 Encoder 正反向 (若推動機器人時座標變負數可修改此處)
+        odo.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD
+        );
+
+        // 4. 重設座標與角度
         reset();
     }
 
     public void reset() {
-        imu.resetYaw();
-        lastForward = podForward.getCurrentPosition() * INCHES_PER_TICK;
-        lastStrafe = podStrafe.getCurrentPosition() * INCHES_PER_TICK;
-        x = 0;
-        y = 0;
-        heading = 0;
+        odo.resetPosAndIMU(); // 強制歸零
     }
 
     public void update() {
-        double curForward = podForward.getCurrentPosition() * INCHES_PER_TICK;
-        double curStrafe = podStrafe.getCurrentPosition() * INCHES_PER_TICK;
+        // 觸發 Pinpoint 讀取與計算
+        odo.update();
 
-        double dForward = curForward - lastForward;
-        double dStrafe = curStrafe - lastStrafe;
-
-        heading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
-
-        double dX = dStrafe * Math.cos(heading) + dForward * Math.sin(heading);
-        double dY = -dStrafe * Math.sin(heading) + dForward * Math.cos(heading);
-
-        x += dX;
-        y += dY;
-
-        lastForward = curForward;
-        lastStrafe = curStrafe;
+        // 提取計算好的場地絕對座標
+        Pose2D pose = odo.getPosition();
+        x = pose.getX(DistanceUnit.INCH);      // 轉換為 吋
+        y = pose.getY(DistanceUnit.INCH);      // 轉換為 吋
+        heading = pose.getHeading(AngleUnit.RADIANS); // 取得弧度角
     }
 }

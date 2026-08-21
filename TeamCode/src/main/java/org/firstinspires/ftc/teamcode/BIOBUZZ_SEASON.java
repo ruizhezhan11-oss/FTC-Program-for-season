@@ -8,7 +8,7 @@ import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 
 
 @TeleOp(name="TEAMOP")
-public abstract class BIOBUZZ_SEASON extends LinearOpMode {
+public class BIOBUZZ_SEASON extends LinearOpMode {
     DcMotor BL,BR,FL,FR;
     public void init_hardware(){
         BL=hardwareMap.get(DcMotor.class,"BL");
@@ -51,7 +51,6 @@ public abstract class BIOBUZZ_SEASON extends LinearOpMode {
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
 
-
             BL.setPower(rotY + rotX + rx);
             BR.setPower(rotY - rotX - rx);
             FL.setPower(rotY - rotX + rx);
@@ -63,6 +62,7 @@ public abstract class BIOBUZZ_SEASON extends LinearOpMode {
             telemetry.addData("絕對角度 (度)", "%.2f", Math.toDegrees(botHeading));
             telemetry.update();
             //絕對底盤結束
+
         }
     }
 }
