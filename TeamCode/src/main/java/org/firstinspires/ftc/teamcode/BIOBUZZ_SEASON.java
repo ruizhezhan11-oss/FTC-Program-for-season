@@ -15,8 +15,9 @@ import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 
 @TeleOp(name="TEAMOP")
 public class BIOBUZZ_SEASON extends LinearOpMode {
-    DcMotor BL,BR,FL,FR;
+    private DcMotor BL,BR,FL,FR;
     public void init_hardware(){
+
         BL=hardwareMap.get(DcMotor.class,"BL");
         BR=hardwareMap.get(DcMotor.class,"BR");
         FL=hardwareMap.get(DcMotor.class,"FL");
@@ -35,19 +36,19 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
         FR.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
     public class SimpleLocalizer {
-        public GoBildaPinpointDriver smallbox;
-        public double x = 0, y = 0, heading = 0;
+        public GoBildaPinpointDriver smallbox; //註冊Pinpoint
+        public double x = 0, y = 0, heading = 0; //xy軸
 
-        public SimpleLocalizer (HardwareMap hardwareMap) {
-            // 讀取在 Robot Configuration 裡設定名稱為 "pinpoint" 的裝置
+        public SimpleLocalizer (HardwareMap hardwareMap) { //HardwareMap連結
+            //
             smallbox = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
 
-            // 1. 設定定位輪類型 4Bar
+            //設定xy位輪類型 (4Bar)
             smallbox.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
 
-            // 2. 設定 Pod 距離機器人旋轉中心的物理距離 (單位：公釐 mm)
+            //設定 Pod 距離機器人旋轉中心的物理距離 (單位：公釐 mm)
             smallbox.setOffsets(-84.0, -168.0, DistanceUnit.MM);
-            // 3. 設定 Encoder 正反向 (若推動機器人時座標變負數可修改此處)
+            //  設定 Encoder
             smallbox.setEncoderDirections(
                     GoBildaPinpointDriver.EncoderDirection.FORWARD,
                     GoBildaPinpointDriver.EncoderDirection.FORWARD
