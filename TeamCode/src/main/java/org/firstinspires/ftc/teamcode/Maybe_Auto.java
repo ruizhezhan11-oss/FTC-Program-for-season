@@ -12,9 +12,16 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+//Road Runner
+import com.acmerobotics.roadrunner.geometry.Pose2d;
+import com.acmerobotics.roadrunner.geometry.Vector2d; //座標
+import com.acmerobotics.roadrunner.trajectory.Trajectory;
+import com.acmerobotics.roadrunner.trajectory.BaseTrajectoryBuilder; //軌跡
+import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 
 import java.util.List;
 
@@ -42,7 +49,7 @@ public class Maybe_Auto extends LinearOpMode {
     // 定位系統 (goBILDA Pinpoint Odometry)
     public static class AutoLocalizer {
         public GoBildaPinpointDriver smallbox;
-        public double x = 0, y = 0, heading = 0;
+        public double x=0,y=0,heading=0;
 
         public AutoLocalizer(HardwareMap hardwareMap) {
             smallbox = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
@@ -64,9 +71,9 @@ public class Maybe_Auto extends LinearOpMode {
         public void update() {
             smallbox.update();
             Pose2D pose = smallbox.getPosition();
-            x = pose.getX(DistanceUnit.INCH);
-            y = pose.getY(DistanceUnit.INCH);
-            heading = pose.getHeading(AngleUnit.RADIANS);
+             x = pose.getX(DistanceUnit.INCH);
+             y = pose.getY(DistanceUnit.INCH);
+             heading = pose.getHeading(AngleUnit.RADIANS);
         }
 
         // 強制寫入絕對座標 (單位：Inches, Radians)
@@ -106,6 +113,7 @@ public class Maybe_Auto extends LinearOpMode {
         cameraServo.setPosition(currentServoPos);
     }
 
+
     @Override
     public void runOpMode() {
         init_hardware();
@@ -128,6 +136,14 @@ public class Maybe_Auto extends LinearOpMode {
 
         telemetry.addData("狀態", "自動模式初始化完成，擺正車頭後按 Play");
         telemetry.update();
+        Pose2d startPose = new Pose2d(0, 0, Math.toRadians(0));
+        SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+        drive.setPoseEstimate(startPose);
+        //軌跡
+        Trajectory TRA = drive.trajectoryBuilder(startPose)
+        .forward(24)
+        .build();
+
 
         waitForStart();
         timer.reset();
