@@ -20,22 +20,21 @@ import java.util.List;
 @TeleOp(name="AutoTurretWithTriggerOverride")
 public class BIOBUZZ_SEASON extends LinearOpMode {
 
-    // 底盤與砲台轉向馬達
     private DcMotor BL, BR, FL, FR;
-    private DcMotor camera_angle; // 砲台 DC 馬達
+    private DcMotor camera_angle;
 
-    // 定位與視覺
     private GoBildaPinpointDriver pinpoint;
     private AprilTagProcessor aprilTag;
     private VisionPortal visionPortal;
 
-    // 砲台 PID 控制參數
+    // PID 參數
     private double kP = 0.03;
     private double kI = 0.000;
     private double kD = 0.003;
     private double integralSum = 0;
     private double lastError = 0;
-    private ElapsedTime timer = new ElapsedTime();
+    private ElapsedTime pidTimer = new ElapsedTime();
+    private boolean isPidActive = false;
 
     @Override
     public void runOpMode() {
@@ -46,11 +45,11 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
         telemetry.update();
 
         waitForStart();
-        timer.reset();
+        pidTimer.reset();
 
         while (opModeIsActive()) {
             // =========================================================
-            // 1. 底盤 Field-Centric 全向駕馭
+            // 1. 底盤 Field-Centric 全向駕馭 (加入死區過濾與歸一化)
             // =========================================================
             pinpoint.update();
             Pose2D pose = pinpoint.getPosition();
@@ -60,68 +59,104 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
                 pinpoint.resetPosAndIMU();
             }
 
-            double y = -gamepad1.left_stick_y;
-            double x = gamepad1.left_stick_x;
-            double rx = gamepad1.right_stick_x;
+            double y = applyDeadzone(-gamepad1.left_stick_y);
+            double x = applyDeadzone(gamepad1.left_stick_x);
+            double rx = applyDeadzone(gamepad1.right_stick_x);
 
+            // Field-Centric 座標轉換
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
-            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1.0);
 
-            BL.setPower((rotY + rotX + rx) / denominator);
-            BR.setPower((rotY - rotX - rx) / denominator);
-            FL.setPower((rotY - rotX + rx) / denominator);
-            FR.setPower((rotY + rotX - rx) / denominator);
+            // 標準 Mecanum 矩陣（FL/BR 與 FR/BL 對角同號）
+            double flPower = rotY + rotX + rx;
+            double frPower = rotY - rotX - rx;
+            double blPower = rotY - rotX + rx;
+            double brPower = rotY + rotX - rx;
 
+            double maxPower = Math.max(1.0, Math.max(
+                    Math.max(Math.abs(flPower), Math.abs(frPower)),
+                    Math.max(Math.abs(blPower), Math.abs(brPower))
+            ));
+
+            FL.setPower(flPower / maxPower);
+            FR.setPower(frPower / maxPower);
+            BL.setPower(blPower / maxPower);
+            BR.setPower(brPower / maxPower);
 
             // =========================================================
-            // 2. 砲台轉向控制：自動 PID 瞄準 vs. RT/LT 手動 Trigger 迴圈
+            // 2. 砲台轉向控制：優先權邏輯與 PID 瞄準
             // =========================================================
-
-            // 計算操控手按下 Trigger 的差值 (RT 順時針, LT 逆時針)
             double manualPower = gamepad1.right_trigger - gamepad1.left_trigger;
 
-            List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-            boolean tagFound = false;
-
-            // (A) 優先條件：如果操控手有壓下 RT 或 LT (超過死區 0.05)，強制切換為手動控制
             if (Math.abs(manualPower) > 0.05) {
+                // (A) 駕駛手動 Override 優先
+                resetPID();
                 camera_angle.setPower(manualPower);
-                integralSum = 0; // 重置 PID 積分防止突衝
-                telemetry.addData("砲台控制模式", "🎮 駕駛員手動控制中 (RT/LT)");
-            }
-            // (B) 操控手沒按 Trigger，且有看到 AprilTag：執行 PID 自動鎖定
-            else if (!currentDetections.isEmpty()) {
-                for (AprilTagDetection detection : currentDetections) {
-                    if (detection.metadata != null) {
-                        double error = detection.ftcPose.x; // 畫面水平誤差 (inches)
+                telemetry.addData("砲台控制模式", "🎮 駕駛員手動控制 (RT/LT)");
+            } else {
+                AprilTagDetection targetTag = getPrimaryDetection();
+                if (targetTag != null) {
+                    // (B) 自動 PID 鎖定 AprilTag
+                    double error = targetTag.ftcPose.x; // 水平位置偏差 (inches)
+                    double pidOutput = updatePID(0, error);
+                    double power = Math.max(-1.0, Math.min(1.0, pidOutput));
 
-                        // PID 計算
-                        double motorPower = calculatePID(0, error);
-                        motorPower = Math.max(-1.0, Math.min(1.0, motorPower));
-
-                        camera_angle.setPower(motorPower);
-
-                        telemetry.addData("砲台控制模式", "🎯 自動 PID 瞄準鎖定中");
-                        telemetry.addData("鎖定 Tag ID", detection.id);
-                        telemetry.addData("水平偏差 (in)", "%.2f", error);
-                        telemetry.addData("馬達 Power", "%.2f", motorPower);
-                        tagFound = true;
-                        break;
-                    }
+                    camera_angle.setPower(power);
+                    telemetry.addData("砲台控制模式", "🎯 PID 鎖定 Tag ID: %d", targetTag.id);
+                    telemetry.addData("水平偏差 (in)", "%.2f", error);
+                    telemetry.addData("馬達 Power", "%.2f", power);
+                } else {
+                    // (C) 無目標且無手動操作：煞車待命
+                    resetPID();
+                    camera_angle.setPower(0);
+                    telemetry.addData("砲台控制模式", "⏸️ 待命 / 自動煞車鎖定");
                 }
-            }
-
-            // (C) 沒按 Trigger，也沒看到 Tag：馬達動力歸零，靠 BRAKE 模式自動煞車鎖定
-            if (Math.abs(manualPower) <= 0.05 && !tagFound) {
-                camera_angle.setPower(0);
-                integralSum = 0; // 重置 PID 積分
-                telemetry.addData("砲台控制模式", "⏸️ 待命/自動煞車鎖定中");
             }
 
             telemetry.addData("車頭角度 (Deg)", "%.2f", Math.toDegrees(botHeading));
             telemetry.update();
         }
+    }
+
+    private double applyDeadzone(double input) {
+        return Math.abs(input) > 0.05 ? input : 0.0;
+    }
+
+    private AprilTagDetection getPrimaryDetection() {
+        List<AprilTagDetection> detections = aprilTag.getDetections();
+        for (AprilTagDetection detection : detections) {
+            if (detection.metadata != null) {
+                return detection;
+            }
+        }
+        return null;
+    }
+
+    private double updatePID(double target, double current) {
+        double error = target - current;
+        double dt = pidTimer.seconds();
+        pidTimer.reset();
+
+        // 避免切換鎖定或丟失目標再重新啟用時，dt 過大引發微分衝擊
+        if (!isPidActive || dt > 0.2) {
+            dt = 0.02; // 設定預估單週期時間 (50Hz)
+            isPidActive = true;
+        }
+
+        double pOutput = kP * error;
+        integralSum += error * dt;
+        double iOutput = kI * integralSum;
+        double derivative = (error - lastError) / dt;
+        double dOutput = kD * derivative;
+
+        lastError = error;
+        return pOutput + iOutput + dOutput;
+    }
+
+    private void resetPID() {
+        integralSum = 0;
+        lastError = 0;
+        isPidActive = false;
     }
 
     private void initHardware() {
@@ -141,12 +176,10 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
         BR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         FL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        // 砲台馬達設定為 BRAKE 模式，Power 設為 0 時會鎖死角度
         camera_angle.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
         camera_angle.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        // Odometry 定位板
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         pinpoint.setOffsets(-84.0, -168.0, DistanceUnit.MM);
@@ -169,22 +202,5 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
                 .addProcessor(aprilTag)
                 .build();
-    }
-
-    private double calculatePID(double target, double current) {
-        double error = target - current;
-        double dt = timer.seconds();
-        timer.reset();
-
-        if (dt <= 0) dt = 0.001;
-
-        double pOutput = kP * error;
-        integralSum += error * dt;
-        double iOutput = kI * integralSum;
-        double derivative = (error - lastError) / dt;
-        double dOutput = kD * derivative;
-
-        lastError = error;
-        return pOutput + iOutput + dOutput;
     }
 }
