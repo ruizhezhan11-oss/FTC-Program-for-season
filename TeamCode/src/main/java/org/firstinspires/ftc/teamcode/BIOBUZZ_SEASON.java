@@ -48,9 +48,7 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
         pidTimer.reset();
 
         while (opModeIsActive()) {
-            // =========================================================
-            // 1. 底盤 Field-Centric 全向駕馭 (加入死區過濾與歸一化)
-            // =========================================================
+            // 1. 底盤
             pinpoint.update();
             Pose2D pose = pinpoint.getPosition();
             double botHeading = pose.getHeading(AngleUnit.RADIANS);
@@ -67,7 +65,6 @@ public class BIOBUZZ_SEASON extends LinearOpMode {
             double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
             double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
 
-            // 標準 Mecanum 矩陣（FL/BR 與 FR/BL 對角同號）
             double flPower = rotY + rotX + rx;
             double frPower = rotY - rotX - rx;
             double blPower = rotY - rotX + rx;
