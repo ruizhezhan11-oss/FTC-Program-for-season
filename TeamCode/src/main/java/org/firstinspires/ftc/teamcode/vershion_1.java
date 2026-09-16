@@ -28,9 +28,13 @@ public class vershion_1 extends LinearOpMode {
         init_hardware();
         waitForStart();
         while (opModeIsActive()){
+            word();
             run();
             telemetry.update();
         }
+    }
+    private void word(){
+        telemetry.addLine("程式啟動");
     }
     private void run(){
         double y= gamepad1.left_stick_y;
