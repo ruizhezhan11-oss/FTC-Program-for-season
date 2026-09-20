@@ -1,49 +1,62 @@
 package org.firstinspires.ftc.teamcode;
-import android.graphics.Canvas;
 import android.util.Size;
-import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
-import org.opencv.core.Mat;
-import com.qualcomm.robotcore.hardware.IMU;
-import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * FTC TeleOp 模式
+ * 功能：
+ * - 麥克納姆輪驅動控制
+ * - IMU 陀螺儀輔助
+ * - AprilTag 視覺識別
+ * - Pinpoint 本體定位
+ */
 @TeleOp
 public class Base extends LinearOpMode {
-    private DcMotor FL,FR,BL,BR;
+    // 馬達
+    private DcMotor FL, FR, BL, BR;
+
+    // 視覺系統
     private AprilTagProcessor aprilTag;
     private VisionPortal camera;
+
+    // 感測器
     private IMU imu;
-    private GoBildaPinpointDriver pinpoint;
-    private void init_(){
+
+    /**
+     * 初始化馬達和 IMU
+     */
+    private void initMotors() {
+        // 獲取硬體
         BL = hardwareMap.get(DcMotor.class, "BL");
         BR = hardwareMap.get(DcMotor.class, "BR");
         FL = hardwareMap.get(DcMotor.class, "FL");
         FR = hardwareMap.get(DcMotor.class, "FR");
 
+        // 設置馬達方向
         BL.setDirection(DcMotor.Direction.REVERSE);
         BR.setDirection(DcMotor.Direction.FORWARD);
         FL.setDirection(DcMotor.Direction.REVERSE);
         FR.setDirection(DcMotor.Direction.FORWARD);
 
+        // 設置馬達制動模式
         BL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         BR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         FL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        IMU imu=hardwareMap.get(IMU.class,"imu");//取代
-        // 請根據 Control Hub 鎖在車上的實際方向調整 Logo 與 USB 轉向：
+
+        // 初始化 IMU
+        this.imu = hardwareMap.get(IMU.class, "imu");
+        // 根據 Control Hub 在機器人上的實際安裝方向調整
         // 範例：REV Logo 朝上 (UP)，USB 接口朝前 (FORWARD)
         IMU.Parameters parameters = new IMU.Parameters(
                 new RevHubOrientationOnRobot(
@@ -53,7 +66,11 @@ public class Base extends LinearOpMode {
         );
         imu.initialize(parameters);
     }
-    private void init_VI(){
+
+    /**
+     * 初始化視覺系統（AprilTag 檢測）
+     */
+    private void initVision() {
         aprilTag = new AprilTagProcessor.Builder()
                 .setDrawTagID(true)
                 .setDrawTagOutline(true)
@@ -62,40 +79,74 @@ public class Base extends LinearOpMode {
                 .build();
 
         camera = new VisionPortal.Builder()
-                .setCameraResolution(new Size(720,480))
+                .setCameraResolution(new Size(1280, 720))  // 標準高清解析度
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
                 .addProcessor(aprilTag)
                 .enableLiveView(true)
                 .setAutoStopLiveView(true)
                 .build();
-
     }
+
+    /**
+     * 初始化 GoBilda Pinpoint 定位驅動
+     */
+
     @Override
-    public  void runOpMode(){ //主迴圈
-        init_VI();
-        init_();
-        waitForStart();
-            while (opModeIsActive()){
-            aprilTagTag();
-                if (gamepad1.options) {
-                    imu.resetYaw();
-                }
-            run_code();
-            word_screen();
-            telemetry.update();
-            }
-    }
-    private void run_code() {
+    public void runOpMode() {
+        // 初始化所有系統
+        initVision();
+        initMotors();
 
+        telemetry.addLine("系統初始化完成，等待開始...");
+        telemetry.update();
+
+        waitForStart();
+
+        // 主迴圈
+        while (opModeIsActive()) {
+            // 更新所有感測器和顯示
+            handleInput();
+            updateTelemetry();
+            telemetry.update();
+        }
+
+        // 清理資源
+        if (camera != null) {
+            camera.close();
+        }
+    }
+
+    /**
+     * 處理手柄輸入並控制馬達
+     */
+    private void handleInput() {
+        // 重置 IMU Yaw（通常綁定到某個按鈕）
+        if (gamepad1.options) {
+            imu.resetYaw();
+            telemetry.addLine("IMU Yaw 已重置");
+        }
+
+        // 控制馬達
+        controlDrivetrain();
+    }
+
+    /**
+     * 麥克納姆輪驅動控制
+     */
+    private void controlDrivetrain() {
+        // 獲取 IMU 陀螺儀數據
         double heading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
 
+        // 獲取手柄輸入並應用死區
         double y = -applyDeadzone(gamepad1.left_stick_y);
-        double x = applyDeadzone(gamepad1.left_stick_x) * 1.1; // 1.1 補償橫移摩擦力
+        double x = applyDeadzone(gamepad1.left_stick_x) * 1.1;  // 1.1 補償橫移摩擦力
         double rx = applyDeadzone(gamepad1.right_stick_x);
 
+        // 應用 IMU 陀螺儀補償（場景中心驅動）
         double rotX = x * Math.cos(-heading) - y * Math.sin(-heading);
         double rotY = x * Math.sin(-heading) + y * Math.cos(-heading);
 
+        // 計算每個馬達的功率
         double flPower = rotY + rotX + rx;
         double frPower = rotY - rotX - rx;
         double blPower = rotY - rotX + rx;
@@ -111,38 +162,63 @@ public class Base extends LinearOpMode {
             brPower /= max;
         }
 
+        // 應用馬達功率
         FL.setPower(flPower);
         FR.setPower(frPower);
         BL.setPower(blPower);
         BR.setPower(brPower);
     }
 
-    private void word_screen(){
-        telemetry.addData("Heading",pinpoint.getHeading(AngleUnit.DEGREES));
-        telemetry.addData("X",pinpoint.getEncoderX());
-        telemetry.addData("Y",pinpoint.getEncoderY());
+    /**
+     * 更新所有遙測資料
+     */
+    private void updateTelemetry() {
+        telemetry.addLine("========== IMU 資料 ==========");
+        double yaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+        telemetry.addData("Yaw (陀螺儀)", String.format("%.1f°", yaw));
+
+        telemetry.addLine("\n========== Pinpoint 定位 ==========");
+
+
+        telemetry.addLine("\n========== AprilTag 檢測 ==========");
+        displayAprilTagDetections();
+
+        telemetry.addLine("\n========== 手柄輸入 ==========");
+        telemetry.addData("左搖桿", String.format("X:%.2f Y:%.2f", gamepad1.left_stick_x, gamepad1.left_stick_y));
+        telemetry.addData("右搖桿 X", String.format("%.2f", gamepad1.right_stick_x));
     }
-    private double applyDeadzone(double input) {
-        return Math.abs(input) > 0.05 ? input : 0.0;
-    }
-    private void aprilTagTag(){  //辨識
+
+    /**
+     * 顯示 AprilTag 檢測結果
+     */
+    private void displayAprilTagDetections() {
         List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-        telemetry.addData("# Detected Tags", currentDetections.size());
+        telemetry.addData("檢測到的標籤數", currentDetections.size());
+
         for (AprilTagDetection detection : currentDetections) {
             if (detection.metadata != null) {
                 // 已註冊於 TagLibrary 的官方標籤
-                telemetry.addLine(String.format("\n==== Target ID %d (%s) ====", detection.id, detection.metadata.name));
-                telemetry.addLine(String.format("XYZ Pos : %6.1f %6.1f %6.1f (Inches)",
+                telemetry.addLine(String.format("\n>>> 標籤 ID %d (%s)",
+                        detection.id, detection.metadata.name));
+                telemetry.addLine(String.format("  位置(X/Y/Z): %.1f / %.1f / %.1f mm",
                         detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-                telemetry.addLine(String.format("RPY Deg : %6.1f %6.1f %6.1f (Degrees)",
-                        detection.ftcPose.roll, detection.ftcPose.pitch, detection.ftcPose.yaw));
-                telemetry.addLine(String.format("Rng/Brg/Yaw: %6.1f %6.1f %6.1f",
+                telemetry.addLine(String.format("  旋轉(P/R/Y): %.1f° / %.1f° / %.1f°",
+                        detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
+                telemetry.addLine(String.format("  距離/方位/Yaw: %.1f mm / %.1f° / %.1f°",
                         detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.yaw));
             } else {
                 // 未註冊的自訂標籤
-                telemetry.addLine(String.format("\nUnknown Tag ID %d detected", detection.id));
+                telemetry.addLine(String.format("未知標籤 ID %d", detection.id));
             }
-            telemetry.update();
         }
+    }
+
+    /**
+     * 應用死區過濾器（消除搖桿漂移）
+     * @param input 原始輸入值（-1.0 到 1.0）
+     * @return 過濾後的值
+     */
+    private double applyDeadzone(double input) {
+        return Math.abs(input) > 0.05 ? input : 0.0;
     }
 }
