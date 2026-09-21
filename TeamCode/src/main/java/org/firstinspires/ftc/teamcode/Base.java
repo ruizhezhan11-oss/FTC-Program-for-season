@@ -1,36 +1,35 @@
 package org.firstinspires.ftc.teamcode;
+
 import android.util.Size;
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
-/**
+/*
  * FTC TeleOp 模式
  * 功能：
  * - 麥克納姆輪驅動控制
- * - IMU 陀螺儀輔助
+ * - Pinpoint 本體定位與陀螺儀輔助（場景中心驅動）
  * - AprilTag 視覺識別
- * - Pinpoint 本體定位
  */
 @TeleOp
 public class Base extends LinearOpMode {
     // 馬達
     private DcMotor FL, FR, BL, BR;
+    private GoBildaPinpointDriver pinpoint1;
 
     // 視覺系統
     private AprilTagProcessor aprilTag;
     private VisionPortal camera;
-
-    // 感測器
-    private IMU imu;
 
     /**
      * 初始化馬達和 IMU
@@ -54,17 +53,15 @@ public class Base extends LinearOpMode {
         FL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        // 初始化 IMU
-        this.imu = hardwareMap.get(IMU.class, "imu");
-        // 根據 Control Hub 在機器人上的實際安裝方向調整
-        // 範例：REV Logo 朝上 (UP)，USB 接口朝前 (FORWARD)
-        IMU.Parameters parameters = new IMU.Parameters(
-                new RevHubOrientationOnRobot(
-                        RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                        RevHubOrientationOnRobot.UsbFacingDirection.FORWARD
-                )
+        // 初始化 Pinpoint 定位
+        pinpoint1 = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint1");
+        pinpoint1.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pinpoint1.setOffsets(111, 111, DistanceUnit.MM);
+        pinpoint1.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD
         );
-        imu.initialize(parameters);
+        pinpoint1.resetPosAndIMU();
     }
 
     /**
@@ -87,23 +84,21 @@ public class Base extends LinearOpMode {
                 .build();
     }
 
-    /**
-     * 初始化 GoBilda Pinpoint 定位驅動
-     */
-
     @Override
     public void runOpMode() {
         // 初始化所有系統
         initVision();
         initMotors();
-
-        telemetry.addLine("系統初始化完成，等待開始...");
-        telemetry.update();
-
         waitForStart();
-
         // 主迴圈
         while (opModeIsActive()) {
+            // 必須在迴圈內更新 Pinpoint 驅動器，才能獲取最新座標與角度
+            pinpoint1.update();
+
+            if (gamepad1.options) {
+                pinpoint1.resetPosAndIMU();
+            }
+
             // 更新所有感測器和顯示
             handleInput();
             updateTelemetry();
@@ -120,13 +115,6 @@ public class Base extends LinearOpMode {
      * 處理手柄輸入並控制馬達
      */
     private void handleInput() {
-        // 重置 IMU Yaw（通常綁定到某個按鈕）
-        if (gamepad1.options) {
-            imu.resetYaw();
-            telemetry.addLine("IMU Yaw 已重置");
-        }
-
-        // 控制馬達
         controlDrivetrain();
     }
 
@@ -134,17 +122,18 @@ public class Base extends LinearOpMode {
      * 麥克納姆輪驅動控制
      */
     private void controlDrivetrain() {
-        // 獲取 IMU 陀螺儀數據
-        double heading = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+        // 獲取定位姿態資料
+        Pose2D pose = pinpoint1.getPosition();
+        double headingInRad = pose.getHeading(AngleUnit.RADIANS);
 
         // 獲取手柄輸入並應用死區
         double y = -applyDeadzone(gamepad1.left_stick_y);
         double x = applyDeadzone(gamepad1.left_stick_x) * 1.1;  // 1.1 補償橫移摩擦力
         double rx = applyDeadzone(gamepad1.right_stick_x);
 
-        // 應用 IMU 陀螺儀補償（場景中心驅動）
-        double rotX = x * Math.cos(-heading) - y * Math.sin(-heading);
-        double rotY = x * Math.sin(-heading) + y * Math.cos(-heading);
+        // 應用陀螺儀補償（場景中心驅動）
+        double rotX = x * Math.cos(-headingInRad) - y * Math.sin(-headingInRad);
+        double rotY = x * Math.sin(-headingInRad) + y * Math.cos(-headingInRad);
 
         // 計算每個馬達的功率
         double flPower = rotY + rotX + rx;
@@ -173,12 +162,16 @@ public class Base extends LinearOpMode {
      * 更新所有遙測資料
      */
     private void updateTelemetry() {
+        // 取得當前姿態
+        Pose2D pose = pinpoint1.getPosition();
+        double yaw = pose.getHeading(AngleUnit.DEGREES);
+
         telemetry.addLine("========== IMU 資料 ==========");
-        double yaw = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
         telemetry.addData("Yaw (陀螺儀)", String.format("%.1f°", yaw));
 
         telemetry.addLine("\n========== Pinpoint 定位 ==========");
-
+        telemetry.addData("X 座標", String.format("%.1f mm", pose.getX(DistanceUnit.MM)));
+        telemetry.addData("Y 座標", String.format("%.1f mm", pose.getY(DistanceUnit.MM)));
 
         telemetry.addLine("\n========== AprilTag 檢測 ==========");
         displayAprilTagDetections();
