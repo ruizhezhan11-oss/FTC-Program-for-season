@@ -14,8 +14,8 @@ public class vershion_1 extends LinearOpMode {
         FR = hardwareMap.get(DcMotor.class, "FR");
 
         BL.setDirection(DcMotor.Direction.REVERSE);
-        BR.setDirection(DcMotor.Direction.FORWARD);
-        FL.setDirection(DcMotor.Direction.REVERSE);
+        BR.setDirection(DcMotor.Direction.REVERSE);
+        FL.setDirection(DcMotor.Direction.FORWARD);
         FR.setDirection(DcMotor.Direction.FORWARD);
 
         BL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
