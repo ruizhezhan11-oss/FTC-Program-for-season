@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import static org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase.getCurrentGameTagLibrary;
+
 import android.util.Size;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -11,6 +13,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
+import org.firstinspires.ftc.vision.apriltag.AprilTagLibrary;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
@@ -29,7 +33,7 @@ public class Base extends LinearOpMode {
 
     // 視覺系統
     private AprilTagProcessor aprilTag;
-    private VisionPortal camera;
+    private VisionPortal camera; //視覺
 
     /**
      * 初始化馬達和 IMU
@@ -69,19 +73,26 @@ public class Base extends LinearOpMode {
      */
     private void initVision() {
         aprilTag = new AprilTagProcessor.Builder()
-                .setDrawTagID(true)
-                .setDrawTagOutline(true)
-                .setDrawAxes(true)
-                .setDrawCubeProjection(true)
+                .setDrawTagID(true) //ID
+                .setDrawTagOutline(true) //繪製外框線
+                .setDrawAxes(true) //繪製坐標軸
+                .setDrawCubeProjection(true) //在標籤上方繪製 3D 虛擬立方體，便於可視化確認距離與姿態
                 .build();
 
         camera = new VisionPortal.Builder()
                 .setCameraResolution(new Size(1280, 720))  // 標準高清解析度
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
+                .setStreamFormat(VisionPortal.StreamFormat.YUY2) //省流
                 .addProcessor(aprilTag)
-                .enableLiveView(true)
+                .enableLiveView(true) //live review
                 .setAutoStopLiveView(true)
                 .build();
+    }
+    private void get_library(){
+        AprilTagProcessor.Builder builder = new AprilTagProcessor.Builder();
+        builder.setTagLibrary(AprilTagGameDatabase.getCurrentGameTagLibrary());
+        AprilTagProcessor processor = builder.build();
+        //依照官方的東西 Builder是另外加東西才用的到
     }
 
     @Override
@@ -89,6 +100,7 @@ public class Base extends LinearOpMode {
         // 初始化所有系統
         initVision();
         initMotors();
+        get_library();
         waitForStart();
         // 主迴圈
         while (opModeIsActive()) {
