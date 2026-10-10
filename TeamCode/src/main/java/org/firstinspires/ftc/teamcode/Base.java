@@ -1,8 +1,8 @@
 package org.firstinspires.ftc.teamcode;
-
-import static org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase.getCurrentGameTagLibrary;
-
 import android.util.Size;
+
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -11,12 +11,13 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
-import org.firstinspires.ftc.vision.apriltag.AprilTagLibrary;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
+import org.firstinspires.ftc.robotcore.external.navigation.Position;
 
 /*
  * FTC TeleOp 模式
@@ -32,8 +33,13 @@ public class Base extends LinearOpMode {
     private GoBildaPinpointDriver pinpoint1;
 
     // 視覺系統
-    private AprilTagProcessor aprilTag;
+    private AprilTagProcessor aprilTagProcessor;
     private VisionPortal camera; //視覺
+    int IdCode;
+    private Position cameraPosition = new Position(DistanceUnit.INCH,
+            0, 0, 0, 0);
+    private YawPitchRollAngles cameraOrientation = new YawPitchRollAngles(AngleUnit.DEGREES,
+            0, -90, 0, 0);
 
     /**
      * 初始化馬達和 IMU
@@ -58,6 +64,9 @@ public class Base extends LinearOpMode {
         FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // 初始化 Pinpoint 定位
+
+    }
+    private void init_locate(){
         pinpoint1 = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint1");
         pinpoint1.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         pinpoint1.setOffsets(111, 111, DistanceUnit.MM);
@@ -72,8 +81,9 @@ public class Base extends LinearOpMode {
      * 初始化視覺系統（AprilTag 檢測）
      */
     private void initVision() {
-        aprilTag = new AprilTagProcessor.Builder()
+        aprilTagProcessor = new AprilTagProcessor.Builder()
                 .setDrawTagID(true) //ID
+                .setCameraPose(cameraPosition, cameraOrientation)
                 .setDrawTagOutline(true) //繪製外框線
                 .setDrawAxes(true) //繪製坐標軸
                 .setDrawCubeProjection(true) //在標籤上方繪製 3D 虛擬立方體，便於可視化確認距離與姿態
@@ -83,7 +93,7 @@ public class Base extends LinearOpMode {
                 .setCameraResolution(new Size(1280, 720))  // 標準高清解析度
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
                 .setStreamFormat(VisionPortal.StreamFormat.YUY2) //省流
-                .addProcessor(aprilTag)
+                .addProcessor(aprilTagProcessor)
                 .enableLiveView(true) //live review
                 .setAutoStopLiveView(true)
                 .build();
@@ -100,13 +110,14 @@ public class Base extends LinearOpMode {
         // 初始化所有系統
         initVision();
         initMotors();
+        init_locate();
         get_library();
         waitForStart();
         // 主迴圈
         while (opModeIsActive()) {
+            displayAprilTagDetections();
             // 必須在迴圈內更新 Pinpoint 驅動器，才能獲取最新座標與角度
             pinpoint1.update();
-
             if (gamepad1.options) {
                 pinpoint1.resetPosAndIMU();
             }
@@ -197,25 +208,32 @@ public class Base extends LinearOpMode {
      * 顯示 AprilTag 檢測結果
      */
     private void displayAprilTagDetections() {
-        List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-        telemetry.addData("檢測到的標籤數", currentDetections.size());
+        List<AprilTagDetection> List = AprilTagProcessor.easyCreateWithDefaults().getDetections();
+        AprilTagDetection AprilTagDetection;
+        for(AprilTagDetection detection : List){
+            if (detection.metadata !=null) {
+                IdCode= detection.id;
+                if(!detection.metadata.name.contains("Obelisk")){
+                    telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f",
+                    detection.robotPose.getPosition().x,
+                    detection.robotPose.getPosition().y,
+                    detection.robotPose.getPosition().z));//顯示XYZ
+                    telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f",
+                            detection.robotPose.getOrientation().getPitch(AngleUnit.DEGREES),
+                            detection.robotPose.getOrientation().getRoll(AngleUnit.DEGREES),
+                            detection.robotPose.getOrientation().getYaw(AngleUnit.DEGREES)));
+                    //PRY
+                }
 
-        for (AprilTagDetection detection : currentDetections) {
-            if (detection.metadata != null) {
-                // 已註冊於 TagLibrary 的官方標籤
-                telemetry.addLine(String.format("\n>>> 標籤 ID %d (%s)",
-                        detection.id, detection.metadata.name));
-                telemetry.addLine(String.format("  位置(X/Y/Z): %.1f / %.1f / %.1f mm",
-                        detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-                telemetry.addLine(String.format("  旋轉(P/R/Y): %.1f° / %.1f° / %.1f°",
-                        detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
-                telemetry.addLine(String.format("  距離/方位/Yaw: %.1f mm / %.1f° / %.1f°",
-                        detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.yaw));
             } else {
-                // 未註冊的自訂標籤
-                telemetry.addLine(String.format("未知標籤 ID %d", detection.id));
+                telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
+                telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
+                // 辨識到未註冊詳細姿態參數的 Tag，仍可取得 ID
+
             }
         }
+        telemetry.addLine("\nkey:\nXYZ = X (Right), Y (Forward), Z (Up) dist.");
+        telemetry.addLine("PRY = Pitch, Roll & Yaw (XYZ Rotation)");
     }
 
     /**
