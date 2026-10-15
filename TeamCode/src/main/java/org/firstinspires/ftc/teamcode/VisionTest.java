@@ -31,18 +31,16 @@ public class VisionTest extends LinearOpMode {
         BR = hardwareMap.get(DcMotor.class, "BR");
         FL = hardwareMap.get(DcMotor.class, "FL");
         FR = hardwareMap.get(DcMotor.class, "FR");
-
         // 設置馬達方向
         BL.setDirection(DcMotor.Direction.REVERSE);
         BR.setDirection(DcMotor.Direction.FORWARD);
         FL.setDirection(DcMotor.Direction.REVERSE);
         FR.setDirection(DcMotor.Direction.FORWARD);
-
-        // 設置馬達制動模式
-        BL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        BR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        FL.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        FR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        //*字串的威力*//
+        for(DcMotor m :new DcMotor[]{BL,BR,FL,FR}){
+            m.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            m.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        };
     }
     private void init_Vision (){
         AprilTagProcessor1= new AprilTagProcessor.Builder()
@@ -89,13 +87,44 @@ public class VisionTest extends LinearOpMode {
         }
         telemetry.addData("Obelisk Id", idCode);
     }
-    @Override
+    private void loop_(){
+        while(idCode !=-1){
+            if(idCode>=30&& idCode<=37){  //紅方
+
+            }
+            if(idCode>=38 && idCode<=45){ //藍方
+
+            }
+
+        }
+    }
+    private void handle(){
+        double y = -gamepad1.left_stick_y; // 前後運動 (搖桿推前為負值，故加負號)
+        double x = gamepad1.left_stick_x * 1.1; // 左右平移 (乘以1.1修正麥克納姆輪側滑損耗)
+        double rx = gamepad1.right_stick_x; // 原地旋轉
+
+        // 麥克納姆輪全向運動運動學算式
+        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1.0);
+        double frontLeftPower  = (y + x + rx) / denominator;
+        double backLeftPower   = (y - x + rx) / denominator;
+        double frontRightPower = (y - x - rx) / denominator;
+        double backRightPower  = (y + x - rx) / denominator;
+
+        FL.setPower(frontLeftPower);
+        BL.setPower(backLeftPower);
+        FL.setPower(frontRightPower);
+        BR.setPower(backRightPower);
+
+    }
+    @Override //*主迴圈
     public void runOpMode(){
         initMotors();
         init_Vision();
         waitForStart();
         while (opModeIsActive()){
         displayAprilTagDetections();
+        handle();
+        loop_();
         telemetry.update();
         }
         if(Camera !=null){
