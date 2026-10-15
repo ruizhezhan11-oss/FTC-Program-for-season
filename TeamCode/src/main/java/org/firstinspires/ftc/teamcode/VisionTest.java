@@ -53,7 +53,7 @@ public class VisionTest extends LinearOpMode {
                 .build();
         Camera= new VisionPortal.Builder()
                 .setCameraResolution(new Size(1280, 720)) // 標準高清解析度
-                .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
+                .setCamera(hardwareMap.get(WebcamName.class, "Camera"))
                 .setStreamFormat(VisionPortal.StreamFormat.YUY2)
                 .addProcessor(AprilTagProcessor1)
                 .enableLiveView(true)
