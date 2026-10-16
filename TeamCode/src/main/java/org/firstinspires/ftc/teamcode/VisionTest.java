@@ -24,6 +24,8 @@ public class VisionTest extends LinearOpMode {
     private AprilTagProcessor AprilTagProcessor1;
     private VisionPortal Camera;
     private int idCode;
+    private boolean Red_Side = false;
+    private boolean Blue_Side= false;
     private final Position cameraPosition = new Position(DistanceUnit.INCH, 0, 0, 0, 0);
     private final YawPitchRollAngles cameraOrientation = new YawPitchRollAngles(AngleUnit.DEGREES, 0, -90, 0, 0);
     private void initMotors() {
@@ -90,10 +92,10 @@ public class VisionTest extends LinearOpMode {
     private void loop_(){
         while(idCode !=-1){
             if(idCode>=30&& idCode<=37){  //紅方
-
+            Red_Side=true;
             }
             if(idCode>=38 && idCode<=45){ //藍方
-
+            Blue_Side=true;
             }
 
         }
