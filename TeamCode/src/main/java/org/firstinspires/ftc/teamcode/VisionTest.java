@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import android.graphics.Color;
 import android.util.Size;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -15,6 +16,10 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagGameDatabase;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+import org.firstinspires.ftc.vision.opencv.ImageRegion;
+import org.firstinspires.ftc.vision.opencv.PredominantColorProcessor;
+
+import java.util.List;
 
 import java.util.List;
 
@@ -22,6 +27,7 @@ import java.util.List;
 public class VisionTest extends LinearOpMode {
     private DcMotor FL, FR, BL, BR;
     private AprilTagProcessor AprilTagProcessor1;
+    private PredominantColorProcessor ColorSensor;
     private VisionPortal Camera;
     private int idCode;
     private boolean Red_Side = false;
@@ -53,7 +59,18 @@ public class VisionTest extends LinearOpMode {
                 .setDrawAxes(true)                // 繪製坐標軸
                 .setDrawCubeProjection(true)      // 繪製 3D 虛擬立方體
                 .build();
+        PredominantColorProcessor ColorSensor =new PredominantColorProcessor.Builder()
+                .setRoi(ImageRegion.entireFrame())
+                .setSwatches(
+                        PredominantColorProcessor.Swatch.BLUE,
+                        PredominantColorProcessor.Swatch.ARTIFACT_GREEN,
+                        PredominantColorProcessor.Swatch.ARTIFACT_PURPLE,
+                        PredominantColorProcessor.Swatch.BLACK,
+                        PredominantColorProcessor.Swatch.RED
+                )
+                .build();
         Camera= new VisionPortal.Builder()
+                .addProcessor(ColorSensor)
                 .setCameraResolution(new Size(1280, 720)) // 標準高清解析度
                 .setCamera(hardwareMap.get(WebcamName.class, "Camera"))
                 .setStreamFormat(VisionPortal.StreamFormat.YUY2)
@@ -61,6 +78,7 @@ public class VisionTest extends LinearOpMode {
                 .enableLiveView(true)
                 .setAutoStopLiveView(true)
                 .build();
+
     }
     private void displayAprilTagDetections() {
         idCode = -1; // 每次重設
@@ -89,17 +107,7 @@ public class VisionTest extends LinearOpMode {
         }
         telemetry.addData("Obelisk Id", idCode);
     }
-    private void loop_(){
-        while(idCode !=-1){
-            if(idCode>=30&& idCode<=37){  //紅方
-            Red_Side=true;
-            }
-            if(idCode>=38 && idCode<=45){ //藍方
-            Blue_Side=true;
-            }
 
-        }
-    }
     private void handle(){
         double y = -gamepad1.left_stick_y; // 前後運動 (搖桿推前為負值，故加負號)
         double x = gamepad1.left_stick_x * 1.1; // 左右平移 (乘以1.1修正麥克納姆輪側滑損耗)
@@ -118,16 +126,24 @@ public class VisionTest extends LinearOpMode {
         BR.setPower(backRightPower);
 
     }
+    private void Color_v(){
+        PredominantColorProcessor.Result result = ColorSensor.getAnalysis();
+        telemetry.addLine(String.format("RGB %3.1f %3.1f %3.1f",
+                result.RGB[0],result.RGB[1],result.RGB[2]));
+        telemetry.addLine(String.format("HSV %3.1f %3.1f %3.1f",
+                result.HSV[0],result.HSV[1],result.HSV[2]));
+        telemetry.update();
+    }
     @Override //*主迴圈
     public void runOpMode(){
-        initMotors();
-        init_Vision();
+        initMotors(); //馬達
+        init_Vision(); //視覺
         waitForStart();
         while (opModeIsActive()){
-        displayAprilTagDetections();
-        handle();
-        loop_();
-        telemetry.update();
+            displayAprilTagDetections(); //AprilTag顯示
+            handle(); //手把
+            Color_v();//color sensor
+            telemetry.update();
         }
         if(Camera !=null){
             Camera.close();
