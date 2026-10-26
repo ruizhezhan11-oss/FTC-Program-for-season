@@ -8,7 +8,9 @@ import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.PIDCoefficients;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -37,6 +39,7 @@ import java.util.List;
 @TeleOp
 public class VisionTest extends LinearOpMode {
     private DcMotor FL, FR, BL, BR = null;
+    private DcMotorEx PIDControl=null;
     private IMU imu = null;
     private AprilTagProcessor AprilTagProcessor1 = null;
     private ColorBlobLocatorProcessor ColorSensor = null;
@@ -44,6 +47,9 @@ public class VisionTest extends LinearOpMode {
     private ColorBlobLocatorProcessor ColorSensor3 = null;
     private PredominantColorProcessor ColorProcessor = null;
     private VisionPortal Camera = null;
+    private final double NEW_P =2.5;
+    private final double NEW_I = 0.1;
+    private final double NEW_D =0.2;
     private int idCode ;
     private boolean Red_Side = false;
     private boolean Blue_Side= false;
@@ -54,6 +60,7 @@ public class VisionTest extends LinearOpMode {
         BR = hardwareMap.get(DcMotor.class, "BR");
         FL = hardwareMap.get(DcMotor.class, "FL");
         FR = hardwareMap.get(DcMotor.class, "FR");
+        PIDControl=hardwareMap.get(DcMotorEx.class,"PIDControl");
         // 設置馬達方向
         BL.setDirection(DcMotor.Direction.REVERSE);
         BR.setDirection(DcMotor.Direction.FORWARD);
@@ -217,6 +224,11 @@ public class VisionTest extends LinearOpMode {
         initMotors(); //馬達、imu
         init_Vision(); //視覺
         waitForStart();
+        //*
+        PIDCoefficients pidOrig = PIDControl.getPIDCoefficients(DcMotor.RunMode.RUN_USING_ENCODER);
+        PIDCoefficients pidNew = new PIDCoefficients(NEW_P, NEW_I, NEW_D);
+        PIDCoefficients pidModified = PIDControl.getPIDCoefficients(DcMotor.RunMode.RUN_USING_ENCODER);
+                                                                                                       //*
         while (opModeIsActive()){
             displayAprilTagDetections(); //AprilTag顯示
             handle(); //手把
