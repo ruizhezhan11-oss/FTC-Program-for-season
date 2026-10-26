@@ -1,7 +1,4 @@
 package org.firstinspires.ftc.teamcode;
-
-import android.graphics.Canvas;
-import android.graphics.Color;
 import android.util.Size;
 
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
