@@ -171,4 +171,7 @@ public class Odo_Locate {
                 .setAutoStopLiveView(true)
                 .build();
     }
+    public void Vision_Locate(){
+
+    }
 }

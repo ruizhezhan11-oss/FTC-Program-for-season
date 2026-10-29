@@ -17,8 +17,8 @@ public class SmallTest extends LinearOpMode {
         BL=hwM.get(DcMotor.class,"BL");
         BR=hwM.get(DcMotor.class,"BR");
 
-        FL.setDirection(DcMotorSimple.Direction.REVERSE);
-        BL.setDirection(DcMotorSimple.Direction.REVERSE);
+        FR.setDirection(DcMotorSimple.Direction.REVERSE);
+        BR.setDirection(DcMotorSimple.Direction.REVERSE);
 
     }
     public void drive(){

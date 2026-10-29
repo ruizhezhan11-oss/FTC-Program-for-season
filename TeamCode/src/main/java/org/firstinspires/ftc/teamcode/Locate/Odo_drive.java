@@ -16,6 +16,7 @@ public class Odo_drive extends LinearOpMode {
 
         while (opModeIsActive()) {
             drive.updateOdometry();   // 一定要每圈更新
+            drive.Vision_init();
             tele();
             if (gamepad1.options) {
                 drive.resetHeading();
