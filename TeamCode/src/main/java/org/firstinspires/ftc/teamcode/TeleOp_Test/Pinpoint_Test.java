@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.FTest;
+package org.firstinspires.ftc.teamcode.TeleOp_Test;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
@@ -10,7 +10,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 
 @TeleOp(name="TEAMOP")
-public class Bar_TF extends LinearOpMode {
+public class Pinpoint_Test extends LinearOpMode {
     DcMotor BL,BR,FL,FR;
     public GoBildaPinpointDriver odo;
 
