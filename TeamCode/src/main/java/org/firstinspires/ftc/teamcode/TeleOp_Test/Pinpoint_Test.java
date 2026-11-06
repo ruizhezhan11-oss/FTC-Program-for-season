@@ -81,20 +81,19 @@ public class Pinpoint_Test extends LinearOpMode {
                 reset();
             }
             double botHeading = heading;
-
-            double _y = -gamepad1.left_stick_y;
-            double _x = gamepad1.left_stick_x;
-            double rx = gamepad1.right_stick_x;
+            double Hy = -gamepad1.left_stick_y;
+            double Hx = gamepad1.left_stick_x;
+            double Hrx = gamepad1.right_stick_x;
 
             //AI幫的啦，誰懂三角函數
-            double rotX = _x * Math.cos(-botHeading) - _y * Math.sin(-botHeading);
-            double rotY = _x * Math.sin(-botHeading) + _y * Math.cos(-botHeading);
+            double rotX = Hx * Math.cos(-botHeading) - Hy * Math.sin(-botHeading);
+            double rotY = Hx * Math.sin(-botHeading) + Hy * Math.cos(-botHeading);
 
-            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1.0);
-            FL.setPower((rotY + rotX + rx) / denominator);
-            FR.setPower((rotY - rotX - rx) / denominator);
-            BL.setPower((rotY - rotX + rx) / denominator);
-            BR.setPower((rotY + rotX - rx) / denominator);
+            double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(Hrx), 1.0);
+            FL.setPower((rotY + rotX + Hrx) / denominator);
+            FR.setPower((rotY - rotX - Hrx) / denominator);
+            BL.setPower((rotY - rotX + Hrx) / denominator);
+            BR.setPower((rotY + rotX - Hrx) / denominator);
 
             // Driver Station 即時監控
             telemetry.addData("絕對座標 X (公分)", "%.2f", (x)*2.54);

@@ -66,31 +66,42 @@ public class Auto_Locate extends LinearOpMode {
     public void runOpMode(){
         init_hardware();
         init_odo();
-        while (opModeIsActive()){
-        Math_Odo();
-        double dx = (target_x-x), dy = (target_y-y) , eh = (target_h-heading);
-        double dist = Math.hypot(dx,dy); //直角三角形定位
-        if(dist<tolerance){
-            break; //後面接上state
-        }
-        double forward = dx*Math.cos(heading) + dy*Math.sin(heading);
-        double strafe = dx*Math.sin(heading) +dy*Math.cos(heading);
-        eh=Math.atan2(Math.sin(eh),Math.cos(eh));
-        //*誤差調整
-        double fwdPower = Range.clip(Kp_drive*forward , -0.5,0.5);
-        double strPower = Range.clip(Kp_drive*strafe,-0.5,0.5);
-        double turnPower = Range.clip(Kp_turn*eh,-0.3,0.3);
+            while (opModeIsActive()){
+            Math_Odo();
 
-            //*驅動程式
-            double fl = fwdPower + strPower + turnPower;
-            double fr = fwdPower - strPower - turnPower;
-            double bl = fwdPower - strPower + turnPower;
-            double br = fwdPower + strPower - turnPower;
-
-            FL.setPower(fl);
-            FR.setPower(fr);
-            BL.setPower(bl);
-            BR.setPower(br);
+            state state = Auto_Locate.state.STEP_1;
+            switch (state) {
+                case STEP_1:
+                double correct_Heading = Math.toRadians(target_h);
+                double dx = (target_x - x), dy = (target_y - y), eh = (correct_Heading - heading);
+                double dist = Math.hypot(dx, dy); //直角三角形定位
+                double forward = dx * Math.cos(heading) + dy * Math.sin(heading);
+                double strafe = dx * Math.sin(heading) + dy * Math.cos(heading);
+                eh = Math.atan2(Math.sin(eh), Math.cos(eh));
+                //*誤差調整
+                double fwdPower = Range.clip(Kp_drive * forward, -0.5, 0.5);
+                double strPower = Range.clip(Kp_drive * strafe, -0.5, 0.5);
+                double turnPower = Range.clip(Kp_turn * eh, -0.3, 0.3);
+                //*驅動程式
+                double fl = fwdPower + strPower + turnPower;
+                double fr = fwdPower - strPower - turnPower;
+                double bl = fwdPower - strPower + turnPower;
+                double br = fwdPower + strPower - turnPower;
+                //*馬達
+                FL.setPower(fl);
+                FR.setPower(fr);
+                BL.setPower(bl);
+                BR.setPower(br);
+                //*判別式
+                if(dist < tolerance){
+                    telemetry.addLine("第一步結束");
+                    telemetry.update();
+                    state = Auto_Locate.state.STEP_2;
+                }
+                break;
+                case STEP_2:
+                    break;
+            }
         }
     }
 }
